@@ -1,4 +1,6 @@
-#!/home/natanael/Documentos/faculdade/av3_funcional/venv/bin/python3
+#!/bin/sh
+'''exec' "/home/natanael/Área de Trabalho/faculdade/av3_funcional/venv/bin/python3" "$0" "$@"
+' '''
 # -*- coding: utf-8 -*-
 import re
 import sys
