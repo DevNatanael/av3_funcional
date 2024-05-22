@@ -3,6 +3,8 @@ from flask import Flask, render_template, request
 
 app = Flask(__name__)
 
+# Função lambda de alta ordem que aplica uma transformação a cada termo
+apply_transformation = lambda terms, transform: [transform(term) for term in terms]
 
 def integral(expression):
     # Remover espaços em branco
@@ -26,7 +28,12 @@ def integral(expression):
     # Dividir a função em termos
     terms = re.split(r'(?=[+-])', func)
 
-    for term in terms:
+    transform = lambda term: term  # Transformação de identidade (não altera o termo)
+
+    # Aplicar a transformação a cada termo usando a função lambda de alta ordem
+    transformed_terms = apply_transformation(terms, transform)
+
+    for term in transformed_terms:
         term = term.strip()
 
         # Verificar se o termo contém uma divisão (ex: 1/x**3)
