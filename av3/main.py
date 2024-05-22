@@ -6,6 +6,22 @@ app = Flask(__name__)
 # Função lambda de alta ordem que aplica uma transformação a cada termo
 apply_transformation = lambda terms, transform: [transform(term) for term in terms]
 
+# Função lambda recursiva para validar a expressão
+validate_term = lambda term: (
+    validate_term_polynomial(term) or
+    validate_term_trig(term) or
+    validate_term_constant(term) or
+    validate_term_division(term)
+)
+
+validate_expression = lambda terms: all(validate_term(term) for term in terms)
+
+# Funções auxiliares para validação de termos específicos
+validate_term_polynomial = lambda term: re.match(r'^\d*\*?x\*\*\d+$', term) or re.match(r'^x\*\*\d+$', term)
+validate_term_trig = lambda term: re.match(r'^(sin|cos|tan|cot|sec|csc)\(x\)$', term)
+validate_term_constant = lambda term: re.match(r'^\d+$', term)
+validate_term_division = lambda term: '/' in term and (re.match(r'^\d+/\d*\*?x\*\*\d+$', term) or re.match(r'^\d+/x$', term))
+
 def integral(expression):
     # Remover espaços em branco
     expression = expression.replace(" ", "")
@@ -22,12 +38,18 @@ def integral(expression):
 
     func = func[5:]  # Remover 'f(x)='
 
-    # Inicializar a resposta
-    result = ""
-
     # Dividir a função em termos
     terms = re.split(r'(?=[+-])', func)
 
+    # Validar a expressão usando a função lambda recursiva
+    if not validate_expression(terms):
+        raise ValueError("A expressão contém termos inválidos.")
+
+    # Inicializar a resposta
+    result = ""
+
+    # Definir a transformação de exemplo: aqui não faremos nenhuma transformação real
+    # mas podemos mostrar como seria usada
     transform = lambda term: term  # Transformação de identidade (não altera o termo)
 
     # Aplicar a transformação a cada termo usando a função lambda de alta ordem
@@ -98,7 +120,10 @@ def calcular_integral():
         # Recebendo a expressão da função do formulário
         expressao = request.form['expressao']
         modelo = "f(x)="+expressao+"dx"
-        resultado = integral(modelo)
+        try:
+            resultado = integral(modelo)
+        except ValueError as e:
+            resultado = str(e)
         return render_template('formulario.html', resultado=resultado)
     return render_template('formulario.html')
 
