@@ -22,6 +22,11 @@ validate_term_trig = lambda term: re.match(r'^(sin|cos|tan|cot|sec|csc)\(x\)$', 
 validate_term_constant = lambda term: re.match(r'^\d+$', term)
 validate_term_division = lambda term: '/' in term and (re.match(r'^\d+/\d*\*?x\*\*\d+$', term) or re.match(r'^\d+/x$', term))
 
+# Funções lambda com currying para processamento da expressão
+curry_add = lambda x: (lambda y: x + y)
+curry_multiply = lambda x: (lambda y: x * y)
+curry_process_term = lambda func: (lambda term: func(term))
+
 def integral(expression):
     # Remover espaços em branco
     expression = expression.replace(" ", "")
@@ -55,7 +60,11 @@ def integral(expression):
     # Aplicar a transformação a cada termo usando a função lambda de alta ordem
     transformed_terms = apply_transformation(terms, transform)
 
-    for term in transformed_terms:
+    # Aplicar currying para processar os termos
+    process = curry_process_term(transform)
+    processed_terms = [process(term.strip()) for term in transformed_terms]
+
+    for term in processed_terms:
         term = term.strip()
 
         # Verificar se o termo contém uma divisão (ex: 1/x**3)
