@@ -27,6 +27,12 @@ curry_add = lambda x: (lambda y: x + y)
 curry_multiply = lambda x: (lambda y: x * y)
 curry_process_term = lambda func: (lambda term: func(term))
 
+# Função lambda com list comprehension
+process_terms_with_list_comprehension = lambda terms: [term.strip() for term in terms if term.strip()]
+
+# Função lambda com dicionário
+process_term_with_dict = lambda term, d: d.get(term, term)
+
 def integral(expression):
     # Remover espaços em branco
     expression = expression.replace(" ", "")
@@ -64,8 +70,27 @@ def integral(expression):
     process = curry_process_term(transform)
     processed_terms = [process(term.strip()) for term in transformed_terms]
 
+    # Usar list comprehension dentro de uma lambda para processar os termos
+    processed_terms = process_terms_with_list_comprehension(processed_terms)
+
+    # Dicionário para termos trigonométricos
+    trig_integrals = {
+        'sin(x)': '-cos(x)',
+        'cos(x)': 'sin(x)',
+        'tan(x)': '-ln|cos(x)|',
+        'cot(x)': 'ln|sin(x)|',
+        'sec(x)': 'ln|sec(x)+tan(x)|',
+        'csc(x)': '-ln|csc(x)+cot(x)|'
+    }
+
     for term in processed_terms:
         term = term.strip()
+
+        # Usar a função lambda com dicionário para processar termos trigonométricos
+        if term in trig_integrals:
+            term = trig_integrals[term]
+            result += f"{term}"
+            continue
 
         # Verificar se o termo contém uma divisão (ex: 1/x**3)
         if '/' in term:
@@ -95,19 +120,6 @@ def integral(expression):
             new_power = power + 1
             coeff = float(coeff) / new_power
             result += f"{coeff:+}*x**{new_power}"
-        # Verificar se o termo é uma função trigonométrica
-        elif term.startswith("sin(x)"):
-            result += "-cos(x)"
-        elif term.startswith("cos(x)"):
-            result += "sin(x)"
-        elif term.startswith("tan(x)"):
-            result += "-ln|cos(x)|"
-        elif term.startswith("cot(x)"):
-            result += "ln|sin(x)|"
-        elif term.startswith("sec(x)"):
-            result += "ln|sec(x)+tan(x)|"
-        elif term.startswith("csc(x)"):
-            result += "-ln|csc(x)+cot(x)|"
         # Verificar se o termo é uma constante
         elif re.match(r'^\d+$', term):
             result += f"+{term}*x"
