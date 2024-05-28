@@ -1,11 +1,26 @@
 import re
 from flask import Flask, render_template, request
-from functools import reduce
 
 app = Flask(__name__)
 
-# Função lambda de alta ordem que aplica uma transformação a cada termo
-apply_transformation = lambda terms, transform: [transform(term) for term in terms]
+# Definição do Monad Transformation que funciona como função de alta ordem
+class MonadTransformation:
+    def __init__(self, terms):
+        self.terms = terms
+
+    def bind(self, func):
+        if self.terms is None:
+            return self
+        else:
+            transformed_terms = [func(term) for term in self.terms]
+            return MonadTransformation(transformed_terms)
+
+    def __str__(self):
+        return f'MonadTransformation({self.terms})'
+
+    @staticmethod
+    def unit(terms):
+        return MonadTransformation(terms)
 
 # Função lambda recursiva para validar a expressão
 validate_term = lambda term: (
@@ -34,6 +49,9 @@ process_terms_with_list_comprehension = lambda terms: [term.strip() for term in 
 # Função lambda com dicionário
 process_term_with_dict = lambda term, d: d.get(term, term)
 
+# Função de alta ordem e monad
+apply_transformation = lambda terms, transform: MonadTransformation([transform(term) for term in terms])
+
 def integral(expression):
     # Remover espaços em branco
     expression = expression.replace(" ", "")
@@ -57,6 +75,9 @@ def integral(expression):
     if not validate_expression(terms):
         raise ValueError("A expressão contém termos inválidos.")
 
+    # Filtrar termos que contenham a variável x
+    terms_with_x = list(filter(lambda term: 'x' in term, terms))
+
     # Inicializar a resposta
     result = ""
 
@@ -64,15 +85,15 @@ def integral(expression):
     # mas podemos mostrar como seria usada
     transform = lambda term: term  # Transformação de identidade (não altera o termo)
 
-    # Aplicar a transformação a cada termo usando a função lambda de alta ordem
-    transformed_terms = apply_transformation(terms, transform)
+    # Aplicar a transformação a cada termo usando a função de alta ordem como monad
+    transformed_terms_monad = MonadTransformation.unit(terms_with_x).bind(transform)
 
     # Aplicar currying para processar os termos
     process = curry_process_term(transform)
-    processed_terms = [process(term.strip()) for term in transformed_terms]
+    processed_terms = transformed_terms_monad.bind(process)
 
     # Usar list comprehension dentro de uma lambda para processar os termos
-    processed_terms = process_terms_with_list_comprehension(processed_terms)
+    processed_terms = process_terms_with_list_comprehension(processed_terms.terms)
 
     # Dicionário para termos trigonométricos
     trig_integrals = {
@@ -84,51 +105,46 @@ def integral(expression):
         'csc(x)': '-ln|csc(x)+cot(x)|'
     }
 
-    # Usar o functor `filter` para selecionar apenas os termos trigonométricos
-    trig_terms = list(filter(lambda term: term in trig_integrals, processed_terms))
-
     # Processar os termos trigonométricos separadamente
-    non_trig_terms = list(filter(lambda term: term not in trig_integrals, processed_terms))
-
-    for term in trig_terms:
-        result += trig_integrals[term]
-
-    for term in non_trig_terms:
+    for term in processed_terms:
         term = term.strip()
 
-        # Verificar se o termo contém uma divisão (ex: 1/x**3)
-        if '/' in term:
-            num, denom = term.split('/')
-            if denom.startswith("x**"):
-                power = int(denom[3:])
-                new_power = power - 1
-                coeff = -float(num) / new_power
-                result += f"{coeff:+}/x**{new_power}"
-            elif denom == "x":
-                result += f"+{num}*ln(x)"
+        if term in trig_integrals:
+            result += trig_integrals[term]
+        else:
+            # Verificar se o termo contém uma divisão (ex: 1/x**3)
+            if '/' in term:
+                num, denom = term.split('/')
+                if denom.startswith("x**"):
+                    power = int(denom[3:])
+                    new_power = power - 1
+                    coeff = -float(num) / new_power
+                    result += f"{coeff:+}/x**{new_power}"
+                elif denom == "x":
+                    result += f"+{num}*ln(x)"
+                else:
+                    raise ValueError("Formato de termo não suportado.")
+            # Verificar se o termo é uma potência de x (ex: x**3)
+            elif term.startswith("x**"):
+                power = int(term[3:])
+                new_power = power + 1
+                result += f"+1/{new_power}*x**{new_power}"
+            # Verificar se o termo é um termo polinomial (ex: 3*x**2 ou x**2)
+            elif re.match(r'^\d*\*?x\*\*\d+$', term):
+                match = re.match(r'^(\d*)\*?x\*\*(\d+)$', term)
+                if match.group(1) == '':
+                    coeff = 1
+                else:
+                    coeff = int(match.group(1))
+                power = int(match.group(2))
+                new_power = power + 1
+                coeff = float(coeff) / new_power
+                result += f"{coeff:+}*x**{new_power}"
+            # Verificar se o termo é uma constante
+            elif re.match(r'^\d+$', term):
+                result += f"+{term}*x"
             else:
                 raise ValueError("Formato de termo não suportado.")
-        # Verificar se o termo é uma potência de x (ex: x**3)
-        elif term.startswith("x**"):
-            power = int(term[3:])
-            new_power = power + 1
-            result += f"+1/{new_power}*x**{new_power}"
-        # Verificar se o termo é um termo polinomial (ex: 3*x**2 ou x**2)
-        elif re.match(r'^\d*\*?x\*\*\d+$', term):
-            match = re.match(r'^(\d*)\*?x\*\*(\d+)$', term)
-            if match.group(1) == '':
-                coeff = 1
-            else:
-                coeff = int(match.group(1))
-            power = int(match.group(2))
-            new_power = power + 1
-            coeff = float(coeff) / new_power
-            result += f"{coeff:+}*x**{new_power}"
-        # Verificar se o termo é uma constante
-        elif re.match(r'^\d+$', term):
-            result += f"+{term}*x"
-        else:
-            raise ValueError("Formato de termo não suportado.")
 
     # Adicionar a constante de integração
     result += " + C"
