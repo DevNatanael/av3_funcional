@@ -1,5 +1,6 @@
 import re
 from flask import Flask, render_template, request
+from functools import reduce
 
 app = Flask(__name__)
 
@@ -83,14 +84,17 @@ def integral(expression):
         'csc(x)': '-ln|csc(x)+cot(x)|'
     }
 
-    for term in processed_terms:
-        term = term.strip()
+    # Usar o functor `filter` para selecionar apenas os termos trigonométricos
+    trig_terms = list(filter(lambda term: term in trig_integrals, processed_terms))
 
-        # Usar a função lambda com dicionário para processar termos trigonométricos
-        if term in trig_integrals:
-            term = trig_integrals[term]
-            result += f"{term}"
-            continue
+    # Processar os termos trigonométricos separadamente
+    non_trig_terms = list(filter(lambda term: term not in trig_integrals, processed_terms))
+
+    for term in trig_terms:
+        result += trig_integrals[term]
+
+    for term in non_trig_terms:
+        term = term.strip()
 
         # Verificar se o termo contém uma divisão (ex: 1/x**3)
         if '/' in term:
@@ -140,7 +144,7 @@ def calcular_integral():
     if request.method == 'POST':
         # Recebendo a expressão da função do formulário
         expressao = request.form['expressao']
-        modelo = "f(x)="+expressao+"dx"
+        modelo = "f(x)=" + expressao + "dx"
         try:
             resultado = integral(modelo)
         except ValueError as e:
